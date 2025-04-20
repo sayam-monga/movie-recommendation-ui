@@ -1,0 +1,100 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 93%;
+
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 93%;
+
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 220 91% 64%;
+    --primary-foreground: 0 0% 93%;
+
+    --secondary: 187 100% 42%;
+    --secondary-foreground: 0 0% 93%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 63%;
+
+    --accent: 187 100% 42%;
+    --accent-foreground: 0 0% 93%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 93%;
+
+    --border: 0 0% 16.5%;
+    --input: 0 0% 16.5%;
+    --ring: 220 91% 64%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-dark text-foreground font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-poppins font-semibold;
+  }
+
+  button, .button {
+    @apply rounded-movie transition-all duration-200;
+  }
+
+  button:hover, .button:hover {
+    @apply shadow-md;
+  }
+
+  input {
+    @apply bg-input text-foreground border-0 rounded-md py-2 px-3;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-card rounded-movie shadow-md p-6;
+  }
+
+  .movie-card {
+    @apply bg-card rounded-movie shadow-md p-4 hover:shadow-lg transition-all duration-300;
+  }
+
+  .primary-button {
+    @apply bg-primaryAccent text-foreground font-semibold px-4 py-2 rounded-movie hover:shadow-[0_0_15px_rgba(79,141,247,0.6)] transition-all duration-300;
+  }
+
+  .secondary-button {
+    @apply bg-input text-foreground px-3 py-1.5 rounded-movie text-sm hover:bg-buttonHover transition-all duration-300;
+  }
+
+  .accent-button {
+    @apply bg-secondaryAccent text-foreground px-3 py-1.5 rounded-movie text-sm hover:shadow-[0_0_15px_rgba(0,188,212,0.6)] transition-all duration-300;
+  }
+
+  .nav-link {
+    @apply text-foreground hover:text-primaryAccent transition-colors duration-200;
+  }
+
+  .page-container {
+    @apply min-h-screen bg-dark p-6;
+  }
+
+  .movie-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+}
