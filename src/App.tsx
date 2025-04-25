@@ -11,7 +11,7 @@ import Watchlist from "./pages/Watchlist";
 import LikedMovies from "./pages/LikedMovies";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient(); //initial
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
