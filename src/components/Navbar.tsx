@@ -63,6 +63,16 @@ const Navbar = ({ onSearch }: { onSearch?: (query: string) => void }) => {
           >
             Top Directors
           </Link>
+          <Link
+            to="/recommendations"
+            className={`nav-link ${
+              location.pathname === "/recommendations"
+                ? "text-primaryAccent"
+                : ""
+            }`}
+          >
+            Recommendations
+          </Link>
           <Button
             onClick={handleLogout}
             variant="ghost"

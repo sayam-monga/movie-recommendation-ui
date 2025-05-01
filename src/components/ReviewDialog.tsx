@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { MessageSquare, Star, Send, Edit } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
+//@ts-ignores
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";

@@ -1,20 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import MovieCard, { Movie } from "@/components/MovieCard";
 import Pagination from "@/components/Pagination";
 import Navbar from "@/components/Navbar";
 import api from "@/lib/axios";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 const Dashboard = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [userLikedMovies, setUserLikedMovies] = useState<string[]>([]);
   const [userWatchlist, setUserWatchlist] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [allGenres, setAllGenres] = useState<string[]>([]);
   const moviesPerPage = 8;
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUserData();
@@ -30,10 +34,22 @@ const Dashboard = () => {
     }
   }, [userLikedMovies, userWatchlist, isLoading]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+Shift+A
+      if (e.ctrlKey && e.shiftKey && e.key === "a") {
+        e.preventDefault();
+        navigate("/admin");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
-      // Fetch both liked movies and watchlist in parallel
       const [likedResponse, watchlistResponse] = await Promise.all([
         api.get("/auth/liked"),
         api.get("/auth/watchlist"),
@@ -56,7 +72,6 @@ const Dashboard = () => {
     try {
       const response = await api.get("/movies");
       const moviesData = response.data;
-      // Set both liked and watchlist status based on user's data
       const moviesWithStatus = moviesData.map((movie: any) => ({
         ...movie,
         liked: userLikedMovies.includes(movie._id),
@@ -64,6 +79,13 @@ const Dashboard = () => {
       }));
       setMovies(moviesWithStatus);
       setFilteredMovies(moviesWithStatus);
+
+      // Extract unique genres
+      const genres = new Set<string>();
+      moviesData.forEach((movie: any) => {
+        movie.genres.forEach((genre: string) => genres.add(genre));
+      });
+      setAllGenres([...genres].sort());
     } catch (error: any) {
       toast.error("Failed to fetch movies");
       console.error("Error fetching movies:", error);
@@ -77,24 +99,31 @@ const Dashboard = () => {
         fetchMovies();
         return;
       }
-
       const response = await api.get(
         `/movies/search?q=${encodeURIComponent(query)}`
       );
       const searchResults = response.data;
-
-      // Update both movies and filteredMovies states
       setMovies(searchResults);
       setFilteredMovies(searchResults);
-
-      // Reset to first page when searching
       setCurrentPage(1);
     } catch (error: any) {
       console.error("Search error:", error);
       toast.error("Failed to search movies");
-      // On error, show all movies
       fetchMovies();
     }
+  };
+
+  const handleGenreFilter = (genre: string | null) => {
+    setSelectedGenre(genre);
+    if (!genre) {
+      setFilteredMovies(movies);
+    } else {
+      const filtered = movies.filter((movie) =>
+        movie.genres.some((g) => g.toLowerCase() === genre.toLowerCase())
+      );
+      setFilteredMovies(filtered);
+    }
+    setCurrentPage(1);
   };
 
   const handleToggleLike = async (id: string) => {
@@ -174,25 +203,59 @@ const Dashboard = () => {
         <div className="container mx-auto">
           <h1 className="text-3xl font-bold mb-8">Movie Dashboard</h1>
 
-          {/* Search Bar */}
-          <div className="relative mb-12 max-w-xl mx-auto">
+          {/* Search and Filter Section */}
+          <div className="mb-12 space-y-6">
+            {/* Search Bar */}
+            <div className="relative max-w-xl mx-auto">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 transition-colors duration-200" />
+                <input
+                  type="text"
+                  placeholder="Search movies by title, genre, director, or year..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full pl-12 pr-6 py-3 rounded-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 hover:bg-gray-800/70"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => handleSearch("")}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors duration-200"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Genre Filter */}
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 transition-colors duration-200" />
-              <input
-                type="text"
-                placeholder="Search movies by title, genre, director, or year..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full pl-12 pr-6 py-3 rounded-full bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200 hover:bg-gray-800/70"
-              />
-              {searchQuery && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 <button
-                  onClick={() => handleSearch("")}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors duration-200"
+                  onClick={() => handleGenreFilter(null)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    !selectedGenre
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50"
+                  }`}
                 >
-                  ×
+                  All
                 </button>
-              )}
+                {allGenres.map((genre) => (
+                  <button
+                    key={genre}
+                    onClick={() => handleGenreFilter(genre)}
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      selectedGenre === genre
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50"
+                    }`}
+                  >
+                    {genre}
+                  </button>
+                ))}
+              </div>
+              {/* Gradient fade effect */}
+              <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-900 to-transparent pointer-events-none" />
             </div>
           </div>
 
@@ -203,8 +266,8 @@ const Dashboard = () => {
           ) : filteredMovies.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-xl text-muted-foreground">
-                {searchQuery
-                  ? "No movies found. Try a different search term."
+                {searchQuery || selectedGenre
+                  ? "No movies found. Try a different search term or genre."
                   : "No movies available."}
               </p>
             </div>
