@@ -5,10 +5,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Star, Send, Edit } from "lucide-react";
+import { MessageSquare, Star, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
-//@ts-ignores
+// @ts-ignore
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -46,10 +46,10 @@ const ReviewDialog = ({
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if user has already reviewed this movie
-    const userReview = reviews.find(
-      (review) => review.user === localStorage.getItem("username")
-    );
+    const currentUserId = localStorage.getItem("userId");
+    if (!currentUserId) return;
+
+    const userReview = reviews.find((review) => review.user === currentUserId);
     if (userReview) {
       setExistingReview(userReview);
       setRating(userReview.rating);
@@ -79,6 +79,7 @@ const ReviewDialog = ({
           title: "Review submitted",
           description: "Your review has been successfully added.",
         });
+        onOpenChange(false); // Optional: Close the dialog
       }
     } catch (error: any) {
       console.error("Error submitting review:", error);
@@ -122,6 +123,51 @@ const ReviewDialog = ({
             Reviews for {movieTitle}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Reviews List */}
+        {reviews.length === 0 ? (
+          <div className="text-center py-8">
+            <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+            <p className="text-gray-400">No reviews yet</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[300px] overflow-y-auto">
+            {reviews.map((review) => (
+              <div
+                key={review._id}
+                className="p-4 rounded-lg bg-gray-800/50 border border-gray-700"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < review.rating
+                              ? "text-yellow-400 fill-current"
+                              : "text-gray-400"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm font-medium text-white">
+                      {review.user}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {new Date(review.createdAt).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-300">{review.comment}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Add Review Section */}
         <div className="space-y-4 p-4 bg-gray-800/50 rounded-lg">
@@ -183,47 +229,6 @@ const ReviewDialog = ({
             </>
           )}
         </div>
-
-        {/* Reviews List */}
-        {reviews.length === 0 ? (
-          <div className="text-center py-8">
-            <MessageSquare className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-            <p className="text-gray-400">No reviews yet</p>
-          </div>
-        ) : (
-          <div className="space-y-4 max-h-[300px] overflow-y-auto">
-            {reviews.map((review) => (
-              <div
-                key={review._id}
-                className="p-4 rounded-lg bg-gray-800/50 border border-gray-700"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`h-4 w-4 ${
-                            i < review.rating
-                              ? "text-yellow-400 fill-current"
-                              : "text-gray-400"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium text-white">
-                      {review.user}
-                    </span>
-                  </div>
-                  <span className="text-xs text-gray-400">
-                    {new Date(review.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-300">{review.comment}</p>
-              </div>
-            ))}
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );
