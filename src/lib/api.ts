@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: 'http://localhost:3000/api',
+  baseURL: 'https://movierecobackend-2.onrender.com/api',
   timeout: 5000, // 5 second timeout
 });
 

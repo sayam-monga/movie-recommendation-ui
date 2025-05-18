@@ -9,176 +9,150 @@ import { Search, X } from "lucide-react";
 
 const Dashboard = () => {
   const [movies, setMovies] = useState<Movie[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
   const [filteredMovies, setFilteredMovies] = useState<Movie[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [userLikedMovies, setUserLikedMovies] = useState<string[]>([]);
   const [userWatchlist, setUserWatchlist] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [allGenres, setAllGenres] = useState<string[]>([]);
-  const moviesPerPage = 8;
+  const [isLoading, setIsLoading] = useState(true);
+
   const navigate = useNavigate();
+  const moviesPerPage = 8;
 
   useEffect(() => {
-    fetchUserData();
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [likedRes, watchlistRes, moviesRes] = await Promise.all([
+          api.get("/auth/liked"),
+          api.get("/auth/watchlist"),
+          api.get("/movies"),
+        ]);
+
+        const likedIds = likedRes.data.likedMovies.map((m: any) => m._id);
+        const watchlistIds = watchlistRes.data.watchlist.map((m: any) => m._id);
+
+        setUserLikedMovies(likedIds);
+        setUserWatchlist(watchlistIds);
+
+        const allMovies = moviesRes.data.map((movie: any) => ({
+          ...movie,
+          liked: likedIds.includes(movie._id),
+          inWatchlist: watchlistIds.includes(movie._id),
+        }));
+
+        setMovies(allMovies);
+        setFilteredMovies(allMovies);
+
+        const genres = new Set<string>();
+        allMovies.forEach((m: any) =>
+          m.genres.forEach((g: string) => genres.add(g))
+        );
+        setAllGenres([...genres].sort());
+      } catch (err) {
+        toast.error("Failed to fetch data");
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
   useEffect(() => {
-    if (
-      userLikedMovies.length > 0 ||
-      userWatchlist.length > 0 ||
-      isLoading === false
-    ) {
-      fetchMovies();
-    }
-  }, [userLikedMovies, userWatchlist, isLoading]);
-
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl+Shift+A
       if (e.ctrlKey && e.shiftKey && e.key === "a") {
         e.preventDefault();
         navigate("/admin");
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate]);
 
-  const fetchUserData = async () => {
-    try {
-      setIsLoading(true);
-      const [likedResponse, watchlistResponse] = await Promise.all([
-        api.get("/auth/liked"),
-        api.get("/auth/watchlist"),
-      ]);
-
-      setUserLikedMovies(
-        likedResponse.data.likedMovies.map((movie: any) => movie._id)
-      );
-      setUserWatchlist(
-        watchlistResponse.data.watchlist.map((movie: any) => movie._id)
-      );
-    } catch (error: any) {
-      console.error("Error fetching user data:", error);
-    } finally {
-      setIsLoading(false);
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    setSelectedGenre(null);
+    if (!query.trim()) {
+      setFilteredMovies(movies);
+      return;
     }
-  };
 
-  const fetchMovies = async () => {
     try {
-      const response = await api.get("/movies");
-      const moviesData = response.data;
-      const moviesWithStatus = moviesData.map((movie: any) => ({
+      const res = await api.get(
+        `/movies/search?q=${encodeURIComponent(query)}`
+      );
+      const results = res.data.map((movie: any) => ({
         ...movie,
         liked: userLikedMovies.includes(movie._id),
         inWatchlist: userWatchlist.includes(movie._id),
       }));
-      setMovies(moviesWithStatus);
-      setFilteredMovies(moviesWithStatus);
-
-      // Extract unique genres
-      const genres = new Set<string>();
-      moviesData.forEach((movie: any) => {
-        movie.genres.forEach((genre: string) => genres.add(genre));
-      });
-      setAllGenres([...genres].sort());
-    } catch (error: any) {
-      toast.error("Failed to fetch movies");
-      console.error("Error fetching movies:", error);
-    }
-  };
-
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query);
-    try {
-      if (!query.trim()) {
-        fetchMovies();
-        return;
-      }
-      const response = await api.get(
-        `/movies/search?q=${encodeURIComponent(query)}`
-      );
-      const searchResults = response.data;
-      setMovies(searchResults);
-      setFilteredMovies(searchResults);
+      setFilteredMovies(results);
       setCurrentPage(1);
-    } catch (error: any) {
-      console.error("Search error:", error);
-      toast.error("Failed to search movies");
-      fetchMovies();
+    } catch (err) {
+      toast.error("Search failed");
+      console.error(err);
+      setFilteredMovies(movies);
     }
   };
 
   const handleGenreFilter = (genre: string | null) => {
     setSelectedGenre(genre);
-    if (!genre) {
-      setFilteredMovies(movies);
-    } else {
-      const filtered = movies.filter((movie) =>
-        movie.genres.some((g) => g.toLowerCase() === genre.toLowerCase())
-      );
-      setFilteredMovies(filtered);
-    }
+    setSearchQuery("");
+    const filtered = genre
+      ? movies.filter((m) => m.genres.includes(genre))
+      : movies;
+    setFilteredMovies(filtered);
     setCurrentPage(1);
   };
 
-  const handleToggleLike = async (id: string) => {
-    try {
-      const movie = movies.find((m) => m._id === id);
-      if (!movie) return;
+  const toggleMovieField = (
+    field: "liked" | "inWatchlist",
+    id: string,
+    action: "add" | "remove"
+  ) => {
+    const update = (list: Movie[]) =>
+      list.map((m) => (m._id === id ? { ...m, [field]: action === "add" } : m));
+    setMovies((prev) => update(prev));
+    setFilteredMovies((prev) => update(prev));
+  };
 
-      if (movie.liked) {
+  const handleToggleLike = async (id: string) => {
+    const liked = userLikedMovies.includes(id);
+    try {
+      if (liked) {
         await api.delete("/movies/liked", { data: { movieId: id } });
-        setUserLikedMovies((prev) => prev.filter((movieId) => movieId !== id));
+        setUserLikedMovies((prev) => prev.filter((i) => i !== id));
+        toggleMovieField("liked", id, "remove");
       } else {
         await api.post("/movies/liked", { movieId: id });
         setUserLikedMovies((prev) => [...prev, id]);
+        toggleMovieField("liked", id, "add");
       }
-
-      // Update both movies and filteredMovies states
-      const updateLikedStatus = (movieList: Movie[]) =>
-        movieList.map((movie) =>
-          movie._id === id ? { ...movie, liked: !movie.liked } : movie
-        );
-
-      setMovies((prevMovies) => updateLikedStatus(prevMovies));
-      setFilteredMovies((prevMovies) => updateLikedStatus(prevMovies));
-    } catch (error: any) {
-      toast.error("Failed to update like status");
-      console.error("Error toggling like:", error);
+    } catch (err) {
+      toast.error("Failed to toggle like");
+      console.error(err);
     }
   };
 
   const handleToggleWatchlist = async (id: string) => {
+    const inWatchlist = userWatchlist.includes(id);
     try {
-      const movie = movies.find((m) => m._id === id);
-      if (!movie) return;
-
-      if (movie.inWatchlist) {
+      if (inWatchlist) {
         await api.delete("/movies/watchlist", { data: { movieId: id } });
-        setUserWatchlist((prev) => prev.filter((movieId) => movieId !== id));
+        setUserWatchlist((prev) => prev.filter((i) => i !== id));
+        toggleMovieField("inWatchlist", id, "remove");
       } else {
         await api.post("/movies/watchlist", { movieId: id });
         setUserWatchlist((prev) => [...prev, id]);
+        toggleMovieField("inWatchlist", id, "add");
       }
-
-      // Update both movies and filteredMovies states
-      const updateWatchlistStatus = (movieList: Movie[]) =>
-        movieList.map((movie) =>
-          movie._id === id
-            ? { ...movie, inWatchlist: !movie.inWatchlist }
-            : movie
-        );
-
-      setMovies((prevMovies) => updateWatchlistStatus(prevMovies));
-      setFilteredMovies((prevMovies) => updateWatchlistStatus(prevMovies));
-    } catch (error: any) {
-      toast.error("Failed to update watchlist");
-      console.error("Error toggling watchlist:", error);
+    } catch (err) {
+      toast.error("Failed to toggle watchlist");
+      console.error(err);
     }
   };
 
@@ -188,12 +162,9 @@ const Dashboard = () => {
   };
 
   const totalPages = Math.ceil(filteredMovies.length / moviesPerPage);
-
-  const indexOfLastMovie = currentPage * moviesPerPage;
-  const indexOfFirstMovie = indexOfLastMovie - moviesPerPage;
   const currentMovies = filteredMovies.slice(
-    indexOfFirstMovie,
-    indexOfLastMovie
+    (currentPage - 1) * moviesPerPage,
+    currentPage * moviesPerPage
   );
 
   return (
@@ -203,12 +174,10 @@ const Dashboard = () => {
         <div className="container mx-auto">
           <h1 className="text-3xl font-bold mb-8">Movie Dashboard</h1>
 
-          {/* Search and Filter Section */}
           <div className="mb-12 space-y-6">
-            {/* Search Bar */}
             <div className="relative max-w-xl mx-auto">
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 transition-colors duration-200" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Search movies by title, genre, director, or year..."
@@ -219,20 +188,19 @@ const Dashboard = () => {
                 {searchQuery && (
                   <button
                     onClick={() => handleSearch("")}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300 transition-colors duration-200"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   >
-                    ×
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Genre Filter */}
             <div className="relative">
               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 <button
                   onClick={() => handleGenreFilter(null)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium ${
                     !selectedGenre
                       ? "bg-blue-500 text-white"
                       : "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50"
@@ -244,7 +212,7 @@ const Dashboard = () => {
                   <button
                     key={genre}
                     onClick={() => handleGenreFilter(genre)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    className={`px-4 py-2 rounded-full text-sm font-medium ${
                       selectedGenre === genre
                         ? "bg-blue-500 text-white"
                         : "bg-gray-800/50 text-gray-300 hover:bg-gray-700/50"
@@ -254,7 +222,6 @@ const Dashboard = () => {
                   </button>
                 ))}
               </div>
-              {/* Gradient fade effect */}
               <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-gray-900 to-transparent pointer-events-none" />
             </div>
           </div>
